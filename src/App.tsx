@@ -15,9 +15,15 @@ function App() {
 
   useEffect(() => {
     async function loadKeys() {
-      if (mnemonic) {
+      if (!mnemonic) return;
+      try {
         const kp = await getWalletKeyPair(mnemonic);
         setKeyPair(kp);
+      } catch {
+        localStorage.removeItem('wallet_data');
+        setMnemonic(null);
+        setKeyPair(null);
+        setView('INIT');
       }
     }
     loadKeys();

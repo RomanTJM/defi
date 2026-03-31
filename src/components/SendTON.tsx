@@ -26,21 +26,30 @@ export default function SendTON({ keyPair, onBack }: Props) {
   const [feeLoading, setFeeLoading] = useState(false);
   const [feeExact, setFeeExact] = useState(true);
 
-  // Запрашиваем оценку комиссии при переходе на экран подтверждения
   useEffect(() => {
     if (step !== 'CONFIRM') return;
     const numAmount = parseFloat(amount.replace(',', '.'));
     if (isNaN(numAmount) || numAmount <= 0) return;
 
-    setFeeLoading(true);
-    setFee(null);
-    estimateTransferFee(keyPair, toAddress, numAmount.toString())
-      .then(({ formatted, isExact }) => {
-        setFee(formatted);
-        setFeeExact(isExact);
-      })
-      .finally(() => setFeeLoading(false));
-  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
+
+    const fetchFee = async () => {
+      setFeeLoading(true);
+      setFee(null);
+      try {
+        const { formatted, isExact } = await estimateTransferFee(keyPair, toAddress, numAmount.toString());
+        if (!cancelled) {
+          setFee(formatted);
+          setFeeExact(isExact);
+        }
+      } finally {
+        if (!cancelled) setFeeLoading(false);
+      }
+    };
+
+    fetchFee();
+    return () => { cancelled = true; };
+  }, [step, amount, toAddress, keyPair]);
 
   useEffect(() => {
     async function loadHistory() {

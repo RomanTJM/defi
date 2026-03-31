@@ -64,13 +64,22 @@ export default function CreateImportWallet({ onUnlocked }: Props) {
     onUnlocked(words);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const stored = localStorage.getItem('wallet_data');
     if (!stored) return;
 
     const decrypted = decryptMnemonic(stored, password);
     if (!decrypted || decrypted.length !== 24) {
       setError('Неверный пароль или данные повреждены');
+      return;
+    }
+
+    setIsLoading(true);
+    const valid = await isValidMnemonic(decrypted);
+    setIsLoading(false);
+
+    if (!valid) {
+      setError('Данные кошелька повреждены. Используйте "Сбросить кошелёк" и импортируйте seed-фразу заново.');
       return;
     }
 
@@ -94,7 +103,6 @@ export default function CreateImportWallet({ onUnlocked }: Props) {
 
         {error && <div className="error-box">{error}</div>}
 
-        {/* Скрытое поле username устраняет предупреждение браузера об accessibility в формах с паролем */}
         <input type="text" name="username" autoComplete="username" aria-hidden="true" style={{ display: 'none' }} readOnly />
 
         <label className="label">Пароль</label>
@@ -157,7 +165,6 @@ export default function CreateImportWallet({ onUnlocked }: Props) {
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); handleSaveAndUnlock(); }}>
-        {/* Скрытое поле username устраняет предупреждение браузера об accessibility в формах с паролем */}
         <input type="text" name="username" autoComplete="username" aria-hidden="true" style={{ display: 'none' }} readOnly />
         <div style={{ marginTop: 24, marginBottom: 24 }}>
           <label className="label">Задайте локальный пароль для быстрого входа</label>

@@ -9,41 +9,60 @@ export function isAddressValid(address: string): boolean {
     }
 }
 
-/**
- * Защита от подмены адреса
- * Проверяет, не является ли введенный адрес слишком "похожим" на другие адреса из истории.
- */
-export function checkAddressSpoofing(inputAddress: string, historyAddresses: string[]): { isSpoofed: boolean, message: string } {
-    const inputFormatted = inputAddress.trim();
-    
-    // Если адрес точь-в-точь совпадает с уже известным, мы считаем его безопасным.
-    if (historyAddresses.includes(inputFormatted)) {
-        return { isSpoofed: false, message: '' };
+function normalizeAddress(address: string): string | null {
+    try {
+        return Address.parse(address).toString({ testOnly: true, bounceable: false });
+    } catch {
+        return null;
     }
+}
 
-    // Если нет, ищем "похожие адреса" (совпадают первые и последние N символов)
-    // Злоумышленники часто генерируют адреса с одинаковым началом и концом
-    for (const historyAddr of historyAddresses) {
-        if (historyAddr.length > 8 && inputFormatted.length > 8) {
-            const startHistory = historyAddr.substring(0, 5);
-            const endHistory = historyAddr.slice(-5);
-            
-            const startInput = inputFormatted.substring(0, 5);
-            const endInput = inputFormatted.slice(-5);
-            
-            if (startHistory === startInput && endHistory === endInput) {
-                // Адрес выглядит так же, НО отличается внутри. Это классическая атака Address Spoofing.
-                return { 
-                    isSpoofed: true, 
-                    message: `Осторожно! Этот адрес очень похож на ваш известный контакт (${historyAddr}), но отличается внутренними символами. Возможна подмена адреса!` 
+export function checkAddressSpoofing(inputAddress: string, historyAddresses: string[]): { isSpoofed: boolean, message: string } {
+    const rawInput = inputAddress.trim();
+    const normalizedInput = normalizeAddress(rawInput);
+
+    const normalizedHistory = historyAddresses
+        .map(normalizeAddress)
+        .filter((a): a is string => a !== null);
+
+    if (normalizedInput) {
+        if (normalizedHistory.includes(normalizedInput)) {
+            return { isSpoofed: false, message: '' };
+        }
+
+        for (const historyAddr of normalizedHistory) {
+            if (
+                historyAddr.substring(0, 5) === normalizedInput.substring(0, 5) &&
+                historyAddr.slice(-5) === normalizedInput.slice(-5)
+            ) {
+                return {
+                    isSpoofed: true,
+                    message: `Осторожно! Этот адрес очень похож на ваш известный контакт (${historyAddr}), но отличается внутренними символами. Возможна подмена адреса!`,
                 };
             }
         }
+    } else {
+        if (historyAddresses.includes(rawInput)) {
+            return { isSpoofed: false, message: '' };
+        }
+
+        for (const historyAddr of historyAddresses) {
+            if (historyAddr.length > 8 && rawInput.length > 8) {
+                if (
+                    historyAddr.substring(0, 5) === rawInput.substring(0, 5) &&
+                    historyAddr.slice(-5) === rawInput.slice(-5)
+                ) {
+                    return {
+                        isSpoofed: true,
+                        message: `Осторожно! Этот адрес очень похож на ваш известный контакт (${historyAddr}), но отличается внутренними символами. Возможна подмена адреса!`,
+                    };
+                }
+            }
+        }
     }
-    
-    // Если мы отправляем на абсолютно новый адрес
-    return { 
-        isSpoofed: false, 
-        message: 'Вы отправляете на новый адрес, которого нет в вашей истории. Убедитесь, что он скопирован верно.' 
+
+    return {
+        isSpoofed: false,
+        message: 'Вы отправляете на новый адрес, которого нет в вашей истории. Убедитесь, что он скопирован верно.',
     };
 }
